@@ -1,0 +1,20 @@
+{
+  "name": "Niagara R2 XML Driver",
+  "options": [
+    { "name": "baseUrl", "optionType": "TYPE_STRING", "required": true },
+    { "name": "username", "optionType": "TYPE_STRING", "required": false },
+    { "name": "password", "optionType": "TYPE_STRING", "secret": true, "required": false }
+  ],
+  "layer": {
+    "name": "hpl:niagarar2",
+    "indexed": true,
+    "defaultDisplayAttrs": ["path", "objectType", "units"],
+    "structuredComponents": [
+      { "name": "path", "type": "TAG" },
+      { "name": "objectType", "type": "TAG" },
+      { "name": "units", "type": "TAG" }
+    ],
+    "driver": { "grpcService": "localhost:10002" }
+  },
+  "minNfVersion": "3.8.4-1"
+}
