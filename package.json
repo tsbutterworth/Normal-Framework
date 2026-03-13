@@ -1,0 +1,12 @@
+{
+  "name": "app-niagarar2",
+  "version": "1.0.0",
+  "description": "Normal Framework driver for Niagara R2 Jace via /prism/xml HTTP interface",
+  "type": "commonjs",
+  "dependencies": {
+    "@normalframework/applications-sdk": "0.1.96",
+    "axios": "^1.6.0",
+    "fast-xml-parser": "^4.3.0",
+    "uuid": "*"
+  }
+}
