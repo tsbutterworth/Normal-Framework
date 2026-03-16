@@ -1,0 +1,14 @@
+{
+    "id": "b26c3b12-3c24-4cd0-8f2b-c7f618f6d561",
+    "name": "poll-values",
+    "entryPoint": "/hooks/poll-values.js",
+    "points": {
+          "layer": "hpl:niagarar2",
+          "query": {}
+    },
+    "schedule": {
+          "rrule": "DTSTART:20260101T000000Z\nRRULE:FREQ=MINUTELY;INTERVAL=1"
+    },
+    "mode": "MODE_SCHEDULED",
+    "invokeTimeout": "55s"
+}
