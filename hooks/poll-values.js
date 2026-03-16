@@ -1,7 +1,18 @@
 const NormalSdk = require("@normalframework/applications-sdk");
-const { v5: uuidv5 } = require("uuid");
+const crypto = require("crypto");
 const axios = require("axios");
 const { XMLParser } = require("fast-xml-parser");
+
+// Inline uuidv5 — avoids ESM conflict with uuid package v9+
+function uuidv5(name, namespace) {
+    const nsBytes = Buffer.from(namespace.replace(/-/g, ""), "hex");
+    const nameBytes = Buffer.from(name, "utf8");
+    const hash = crypto.createHash("sha1").update(nsBytes).update(nameBytes).digest();
+    hash[6] = (hash[6] & 0x0f) | 0x50;
+    hash[8] = (hash[8] & 0x3f) | 0x80;
+    const h = hash.toString("hex");
+    return `${h.slice(0,8)}-${h.slice(8,12)}-${h.slice(12,16)}-${h.slice(16,20)}-${h.slice(20,32)}`;
+}
 
 // Root namespace — must match import-points.js so UUIDs resolve correctly
 const ROOT_NAMESPACE = "a1b2c3d4-1234-5678-abcd-ef1234567890";
@@ -19,20 +30,20 @@ const parser = new XMLParser();
  */
 module.exports = async ({ sdk, config, points }) => {
     if (!config.baseUrl) {
-          return NormalSdk.InvokeError("baseUrl is required");
+        return NormalSdk.InvokeError("baseUrl is required");
     }
 
     const authConfig = (config.username && config.password)
-      ? { auth: { username: config.username, password: config.password } }
-          : {};
+        ? { auth: { username: config.username, password: config.password } }
+        : {};
 
     // Build a set of known base URLs for validation
     const knownBases = new Set(
-          config.baseUrl
+        config.baseUrl
             .split(",")
             .map(u => u.trim().replace(/\/+$/, ""))
             .filter(Boolean)
-        );
+    );
 
     // Filter to only data points that have a path attr
     const dataPoints = points.filter(p => p.point_type === "POINT" && p.attrs?.path);
@@ -44,57 +55,57 @@ module.exports = async ({ sdk, config, points }) => {
     const ts = new Date().toISOString();
 
     for (const point of dataPoints) {
-          const link = point.attrs.path;
+        const link = point.attrs.path;
 
-      // Determine which JACE this point belongs to.
-      // Prefer the jaceUrl attr stored during import; fall back to
-      // deriving it from the point's parent UUID if needed.
-      let base = point.attrs.jaceUrl;
+        // Determine which JACE this point belongs to.
+        // Prefer the jaceUrl attr stored during import; fall back to
+        // deriving it from the point's parent UUID if needed.
+        let base = point.attrs.jaceUrl;
 
-      // If jaceUrl attr is missing (legacy points), derive from parent UUID
-      if (!base) {
-              for (const b of knownBases) {
-                        const ns = uuidv5(b, ROOT_NAMESPACE);
-                        if (point.parent_uuid === ns) {
-                                    base = b;
-                                    break;
-                        }
-              }
-      }
+        // If jaceUrl attr is missing (legacy points), derive from parent UUID
+        if (!base) {
+            for (const b of knownBases) {
+                const ns = uuidv5(b, ROOT_NAMESPACE);
+                if (point.parent_uuid === ns) {
+                    base = b;
+                    break;
+                }
+            }
+        }
 
-      if (!base) {
-              sdk.logEvent(`Cannot determine JACE URL for point ${link}, skipping`);
-              errors++;
-              continue;
-      }
+        if (!base) {
+            sdk.logEvent(`Cannot determine JACE URL for point ${link}, skipping`);
+            errors++;
+            continue;
+        }
 
-      try {
-              const { data: xml } = await axios.get(`${base}${link}`, {
-                        ...authConfig,
-                        timeout: 5000,
-              });
+        try {
+            const { data: xml } = await axios.get(`${base}${link}`, {
+                ...authConfig,
+                timeout: 5000,
+            });
 
             const doc = parser.parse(xml)?.nodeDump;
-              if (!doc) continue;
+            if (!doc) continue;
 
             // Extract the present value
             let rawVal = doc.presentValue;
-              if (rawVal === undefined || rawVal === null) continue;
+            if (rawVal === undefined || rawVal === null) continue;
 
             const val = parseFloat(rawVal);
-              if (isNaN(val)) continue;
+            if (isNaN(val)) continue;
 
             await axios.post(`http://${process.env.NFURL}/api/v1/point/data`, {
-                      uuid: point.uuid,
-                      layer: "hpl:niagarar2",
-                      values: [{ ts, real: val }]
+                uuid: point.uuid,
+                layer: "hpl:niagarar2",
+                values: [{ ts, real: val }]
             }, { timeout: 10000 });
 
             updates++;
-      } catch (e) {
-              sdk.logEvent(`Poll error on ${base}${link}: ${e.message}`);
-              errors++;
-      }
+        } catch (e) {
+            sdk.logEvent(`Poll error on ${base}${link}: ${e.message}`);
+            errors++;
+        }
     }
 
     sdk.logEvent(`Poll complete: ${updates} values written, ${errors} errors`);
